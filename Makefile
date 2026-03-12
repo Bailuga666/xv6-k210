@@ -1,5 +1,5 @@
-platform	:= k210
-#platform	:= qemu
+# platform	:= k210
+platform	:= qemu
 # mode := debug
 mode := release
 K=kernel
@@ -126,10 +126,10 @@ k210 = $T/k210.bin
 k210-serialport := /dev/ttyUSB0
 
 ifndef CPUS
-CPUS := 2
+CPUS := 1
 endif
 
-QEMUOPTS = -machine virt -kernel $T/kernel -m 8M -nographic
+QEMUOPTS = -machine virt -kernel $T/kernel -m 32M -nographic
 
 # use multi-core 
 QEMUOPTS += -smp $(CPUS)
@@ -146,7 +146,7 @@ ifeq ($(platform), k210)
 	@$(OBJCOPY) $(RUSTSBI) --strip-all -O binary $(k210)
 	@dd if=$(image) of=$(k210) bs=128k seek=1
 	@$(OBJDUMP) -D -b binary -m riscv $(k210) > $T/k210.asm
-	@sudo chmod 777 $(k210-serialport)
+	@  chmod 777 $(k210-serialport)
 	@python3 ./tools/kflash.py -p $(k210-serialport) -b 1500000 -t $(k210)
 else
 	@$(QEMU) $(QEMUOPTS)
@@ -215,30 +215,30 @@ userprogs: $(UPROGS)
 
 dst=/mnt
 
-# @sudo cp $U/_init $(dst)/init
-# @sudo cp $U/_sh $(dst)/sh
+# @  cp $U/_init $(dst)/init
+# @  cp $U/_sh $(dst)/sh
 # Make fs image
 fs: $(UPROGS)
 	@if [ ! -f "fs.img" ]; then \
 		echo "making fs image..."; \
 		dd if=/dev/zero of=fs.img bs=512k count=512; \
 		mkfs.vfat -F 32 fs.img; fi
-	@sudo mount fs.img $(dst)
-	@if [ ! -d "$(dst)/bin" ]; then sudo mkdir $(dst)/bin; fi
-	@sudo cp README $(dst)/README
+	@  mount fs.img $(dst)
+	@if [ ! -d "$(dst)/bin" ]; then   mkdir $(dst)/bin; fi
+	@  cp README $(dst)/README
 	@for file in $$( ls $U/_* ); do \
-		sudo cp $$file $(dst)/$${file#$U/_};\
-		sudo cp $$file $(dst)/bin/$${file#$U/_}; done
-	@sudo umount $(dst)
+		  cp $$file $(dst)/$${file#$U/_};\
+		  cp $$file $(dst)/bin/$${file#$U/_}; done
+	@  umount $(dst)
 
 # Write mounted sdcard
 sdcard: userprogs
-	@if [ ! -d "$(dst)/bin" ]; then sudo mkdir $(dst)/bin; fi
+	@if [ ! -d "$(dst)/bin" ]; then   mkdir $(dst)/bin; fi
 	@for file in $$( ls $U/_* ); do \
-		sudo cp $$file $(dst)/bin/$${file#$U/_}; done
-	@sudo cp $U/_init $(dst)/init
-	@sudo cp $U/_sh $(dst)/sh
-	@sudo cp README $(dst)/README
+		  cp $$file $(dst)/bin/$${file#$U/_}; done
+	@  cp $U/_init $(dst)/init
+	@  cp $U/_sh $(dst)/sh
+	@  cp README $(dst)/README
 
 clean: 
 	rm -f *.tex *.dvi *.idx *.aux *.log *.ind *.ilg \
@@ -249,3 +249,16 @@ clean:
 	.gdbinit \
 	$U/usys.S \
 	$(UPROGS)
+
+
+all:
+	@make build
+
+dump_initcode: all
+	$(CC) -Os -ffreestanding -fno-common -nostdlib -mno-relax -I. -Ikernel -S $U/init.c -o $U/init.S
+	$(CC) -Os -s -fno-unroll-loops -fmerge-all-constants -ffreestanding -fno-common -nostdlib -mno-relax -I. -Ikernel -c $U/init.c -o $U/init.o
+	$(LD) $(LDFLAGS) -N -e main -Ttext 0 -o $U/_init $U/init.o $U/usys.o $U/printf.o
+	$(OBJCOPY) -S -O binary $U/_init oo
+	$(OBJDUMP) -S $U/_init > $U/init.asm
+	od -v -t x1 -An oo | sed -E 's/ (.{2})/0x\1,/g' > kernel/include/initcode.h
+	rm oo
