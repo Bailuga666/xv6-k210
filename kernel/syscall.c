@@ -234,6 +234,6 @@ sys_sysinfo(void)
 uint64
 sys_shutdown(void) {
   sbi_shutdown();
-  
+
   return 0;
 }
