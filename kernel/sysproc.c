@@ -10,7 +10,8 @@
 #include "include/kalloc.h"
 #include "include/string.h"
 #include "include/printf.h"
-
+#include "include/vm.h"
+#include "include/syscall.h"
 extern int exec(char *path, char **argv);
 
 uint64
@@ -152,5 +153,42 @@ sys_trace(void)
     return -1;
   }
   myproc()->tmask = mask;
+  return 0;
+}
+static int
+safe_copy(uint64 arg_index, char *src, uint64 size)
+{
+  uint64 dest_addr;
+  if (argaddr(arg_index, &dest_addr) < 0)
+    return -1;
+  if (copyout2(dest_addr, src, size) < 0)
+    return -1;
+  return 0;
+}
+
+uint64 sys_uname(void) {
+  struct uname_info {
+    char sysname[65];
+    char nodename[65];
+    char release[65];
+    char version[65];
+    char machine[65];
+    char domainname[65];
+  };
+
+  // 这个数据当前是准备在内核的栈内存中的
+  struct uname_info info = {
+    "xv6",
+    "bailuga",
+    "1.0.0",
+    "1.0.0",
+    "bailuga",
+    "bailuga"
+  };
+  // 瞎写一堆
+  if (safe_copy(0, (char *)&info, sizeof(info)) < 0) {
+    return -1;
+  }
+  // 保证成功复制
   return 0;
 }

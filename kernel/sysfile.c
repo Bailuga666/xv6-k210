@@ -330,39 +330,49 @@ sys_readdir(void)
 
 // get absolute cwd string
 uint64
-sys_getcwd(void)
-{
+sys_getcwd(void) {
   uint64 addr;
-  if (argaddr(0, &addr) < 0)
-    return -1;
-
-  struct dirent *de = myproc()->cwd;
-  char path[FAT32_MAX_PATH];
-  char *s;
-  int len;
-
+  int size;
+  // 地址和缓冲区大小
+  if (argaddr(0, &addr) < 0 || argint(1, &size) < 0)
+    return NULL;
+  // 确保正确读入参数
+  struct dirent* de = myproc()->cwd;
+  char path[size];
+  // 不放在最大的了，只给他缓冲区大小的路径长度
+  char* s = path + sizeof(path) - 1;
+  *s = '\0';
+  // 先给最后写一个/0
   if (de->parent == NULL) {
-    s = "/";
-  } else {
-    s = path + FAT32_MAX_PATH - 1;
-    *s = '\0';
+    s--;
+    *s = '/';
+  }
+  // 如果根目录，直接返回/
+  else {
     while (de->parent) {
-      len = strlen(de->filename);
+      // 如果有父目录
+      int len = strlen(de->filename);
       s -= len;
-      if (s <= path)          // can't reach root "/"
-        return -1;
-      strncpy(s, de->filename, len);
-      *--s = '/';
+      if (s < path)
+        return NULL;
+      // 反向写父目录地址，但是检查会不会出界
+      memmove(s, de->filename, len);
+      // 写入
+      s--;
+      if (s < path)
+        return NULL;
+      *s = '/';
+      // 检查会不会出界，不出界就补一个/
       de = de->parent;
     }
   }
 
-  // if (copyout(myproc()->pagetable, addr, s, strlen(s) + 1) < 0)
-  if (copyout2(addr, s, strlen(s) + 1) < 0)
-    return -1;
-  
-  return 0;
-
+  memmove(path, s, strlen(s) + 1);
+  // 移动到开头
+  if (copyout2(addr, path, strlen(path) + 1) < 0)
+    return NULL;
+  // 如果copy出问题了也null
+  return addr;
 }
 
 // Is the directory dp empty except for "." and ".." ?
