@@ -12,6 +12,7 @@
 #include "include/printf.h"
 #include "include/vm.h"
 #include "include/syscall.h"
+
 extern int exec(char *path, char **argv);
 
 uint64
@@ -84,7 +85,19 @@ sys_wait(void)
   uint64 p;
   if(argaddr(0, &p) < 0)
     return -1;
-  return wait(p);
+  return wait(-1, p);
+}
+
+uint64
+sys_wait4(void)
+{
+  int pid;
+  int options;
+  uint64 status;
+
+  if(argint(0, &pid) < 0 || argaddr(1, &status) < 0 || argint(2, &options) < 0)
+    return -1;
+  return wait4(pid, status, options);
 }
 
 uint64
@@ -191,4 +204,88 @@ uint64 sys_uname(void) {
   }
   // 保证成功复制
   return 0;
+}
+struct timespec {
+    uint64 tv_sec;
+    uint64 tv_usec;
+};
+
+uint64 sys_gettimeofday(void) {
+  struct timespec ts;
+  // 一个结构体
+  uint64 htick = r_time(); 
+  // 取硬件ticks
+
+  ts.tv_sec = htick / CLOCK_FREQ;
+   // 换算成秒
+  ts.tv_usec = (htick % CLOCK_FREQ) * 1000000 / CLOCK_FREQ; 
+  // 换算成微秒
+
+  if (safe_copy(0, (char *)&ts, sizeof(ts)) < 0) {
+    return -1;
+  }
+  // 复制
+  return 0;
+}
+
+uint64
+sys_nanosleep(void)
+{
+  uint64 duration, rem;
+  // 两个参数，存放睡眠时间，返回剩余时间的地址
+  struct timespec req_tv; 
+  // 要求的结构体
+  if (argaddr(0, &duration) < 0 || argaddr(1, &rem) < 0) {
+    return -1;
+  }
+  // 获取两个参数
+  if (copyin2((char *)&req_tv, duration, sizeof(struct timespec)) < 0) {
+    return -1;
+  }
+  // 赋值
+  uint64 target_ticks = req_tv.tv_sec * TICKS_PER_SECOND + req_tv.tv_usec * TICKS_PER_SECOND / 1000000;
+  // 计算需要经过的ticks
+  acquire(&tickslock);
+  // 加锁
+  uint64 ticks_now;
+  // 起始时间
+  ticks_now = ticks;
+  // 记录起始时间
+  while (ticks - ticks_now < target_ticks) {
+    // 时间未到
+    if (myproc()->killed) {
+      // 如果被提前唤醒了
+      if (rem != NULL) {
+        // 如果有存放剩余时间的地址
+        uint64 used_ticks = ticks - ticks_now;
+        uint64 rem_ticks = (target_ticks > used_ticks) ? (target_ticks - used_ticks) : 0;
+        // 计算剩余
+        struct timespec rem_tv;
+        rem_tv.tv_sec = rem_ticks / TICKS_PER_SECOND;
+        rem_tv.tv_usec = (rem_ticks % TICKS_PER_SECOND) * 1000000 / TICKS_PER_SECOND;
+        // 换算成结构体
+        if (copyout2(rem, (char *)&rem_tv, sizeof(struct timespec)) < 0) {
+          release(&tickslock);
+          return -1;
+        }
+        // 复制到目标地址
+      }
+      release(&tickslock);
+      // 解锁
+      return -1;
+      // 参数不对，-1
+    }
+    sleep(&ticks, &tickslock);
+    // 睡眠，等待ticks变化
+  }
+  release(&tickslock);
+  // 解锁
+  return 0;
+
+}
+
+uint64
+sys_clone(void)
+{
+  return clone();
 }

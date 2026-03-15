@@ -31,5 +31,9 @@
 #define SYS_shutdown   210
 #define SYS_uname      160
 #define SYS_times      153
+#define SYS_gettimeofday 169
+#define SYS_nanosleep   101
+#define SYS_clone       220
+#define SYS_wait4      260
 
 #endif

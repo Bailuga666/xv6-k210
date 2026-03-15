@@ -12,6 +12,7 @@
 #include "include/fat32.h"
 #include "include/file.h"
 #include "include/trap.h"
+#include "include/syscall.h"
 #include "include/vm.h"
 
 
@@ -474,11 +475,14 @@ exit(int status)
 // Wait for a child process to exit and return its pid.
 // Return -1 if this process has no children.
 int
-wait(uint64 addr)
+wait(int wpid, uint64 addr)
 {
   struct proc *np;
-  int havekids, pid;
+  int havekids, havetarget, pid;
   struct proc *p = myproc();
+
+  if(wpid == 0 || wpid < -1)
+    return -1;
 
   // hold p->lock for the whole time to avoid lost
   // wakeups from a child's exit().
@@ -487,19 +491,25 @@ wait(uint64 addr)
   for(;;){
     // Scan through table looking for exited children.
     havekids = 0;
+    havetarget = 0;
     for(np = proc; np < &proc[NPROC]; np++){
       // this code uses np->parent without holding np->lock.
       // acquiring the lock first would cause a deadlock,
       // since np might be an ancestor, and we already hold p->lock.
       if(np->parent == p){
+        havekids = 1;
+        if(wpid > 0 && np->pid != wpid){
+          continue;
+        }
         // np->parent can't change between the check and the acquire()
         // because only the parent changes it, and we're the parent.
         acquire(&np->lock);
-        havekids = 1;
+        havetarget = 1;
         if(np->state == ZOMBIE){
           // Found one.
           pid = np->pid;
-          if(addr != 0 && copyout2(addr, (char *)&np->xstate, sizeof(np->xstate)) < 0) {
+          int status = np->xstate << 8;
+          if(addr != 0 && copyout2(addr, (char *)&status, sizeof(status)) < 0) {
             release(&np->lock);
             release(&p->lock);
             return -1;
@@ -518,10 +528,67 @@ wait(uint64 addr)
       release(&p->lock);
       return -1;
     }
+
+    if(wpid > 0 && !havetarget){
+      release(&p->lock);
+      return -1;
+    }
     
     // Wait for a child to exit.
     sleep(p, &p->lock);  //DOC: wait-sleep
   }
+}
+
+int
+wait4(int wpid, uint64 addr, int options)
+{
+  if(options == 0)
+    return wait(wpid, addr);
+
+  // Only support WNOHANG(1) for now.
+  if(options != 1)
+    return -1;
+
+  struct proc *np;
+  int havekids = 0;
+  int havetarget = 0;
+  struct proc *p = myproc();
+
+  if(wpid == 0 || wpid < -1)
+    return -1;
+
+  acquire(&p->lock);
+  for(np = proc; np < &proc[NPROC]; np++){
+    if(np->parent == p){
+      havekids = 1;
+      if(wpid > 0 && np->pid != wpid)
+        continue;
+      acquire(&np->lock);
+      havetarget = 1;
+      if(np->state == ZOMBIE){
+        int pid = np->pid;
+        int status = np->xstate << 8;
+        if(addr != 0 && copyout2(addr, (char *)&status, sizeof(status)) < 0) {
+          release(&np->lock);
+          release(&p->lock);
+          return -1;
+        }
+        freeproc(np);
+        release(&np->lock);
+        release(&p->lock);
+        return pid;
+      }
+      release(&np->lock);
+    }
+  }
+  release(&p->lock);
+
+  if(!havekids)
+    return -1;
+  if(wpid > 0 && !havetarget)
+    return -1;
+
+  return 0;
 }
 
 // Per-CPU process scheduler.
@@ -797,3 +864,58 @@ procnum(void)
   return num;
 }
 
+int
+clone(void)
+{
+  int i, pid;
+  uint64 stack;
+  struct proc *np;
+  struct proc *p = myproc();
+
+  if(argaddr(1, &stack) < 0){
+    return -1;
+  }
+
+  // Allocate process.
+  if((np = allocproc()) == NULL){
+    return -1;
+  }
+
+  // Copy user memory from parent to child.
+  if(uvmcopy(p->pagetable, np->pagetable, np->kpagetable, p->sz) < 0){
+    freeproc(np);
+    release(&np->lock);
+    return -1;
+  }
+  np->sz = p->sz;
+
+  np->parent = p;
+
+  // copy tracing mask from parent.
+  np->tmask = p->tmask;
+
+  // copy saved user registers.
+  *(np->trapframe) = *(p->trapframe);
+
+  // Cause clone to return 0 in the child.
+  np->trapframe->a0 = 0;
+  if(stack != 0){
+    np->trapframe->sp = stack;
+  }
+
+  // increment reference counts on open file descriptors.
+  for(i = 0; i < NOFILE; i++)
+    if(p->ofile[i])
+      np->ofile[i] = filedup(p->ofile[i]);
+  np->cwd = edup(p->cwd);
+
+  safestrcpy(np->name, p->name, sizeof(p->name));
+
+  pid = np->pid;
+
+  np->state = RUNNABLE;
+
+  release(&np->lock);
+
+  return pid;
+}

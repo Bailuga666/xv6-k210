@@ -218,7 +218,7 @@ dst=/mnt
 # @  cp $U/_init $(dst)/init
 # @  cp $U/_sh $(dst)/sh
 # Make fs image
-fs: $(UPROGS)
+fs: $(UPROGS) $(TESTCASES)
 	@if [ ! -f "fs.img" ]; then \
 		echo "making fs image..."; \
 		dd if=/dev/zero of=fs.img bs=512k count=512; \
@@ -229,6 +229,10 @@ fs: $(UPROGS)
 	@for file in $$( ls $U/_* ); do \
 		  cp $$file $(dst)/$${file#$U/_};\
 		  cp $$file $(dst)/bin/$${file#$U/_}; done
+	@for file in $${TEST:-riscv64}/*; do \
+		  [ -f $$file ] || continue; \
+		  cp $$file $(dst)/$${file#$${TEST:-riscv64}/}; \
+		  cp $$file $(dst)/bin/$${file#$${TEST:-riscv64}/}; done
 	@  umount $(dst)
 
 # Write mounted sdcard

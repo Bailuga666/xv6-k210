@@ -44,3 +44,7 @@ entry("rename");
 entry("shutdown");
 entry("uname");
 entry("times");
+entry("gettimeofday");
+entry("nanosleep");
+entry("clone");
+entry("wait4");

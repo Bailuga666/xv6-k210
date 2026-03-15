@@ -34,7 +34,10 @@ int trace(int mask);
 int sysinfo(struct sysinfo *);
 int rename(char *old, char *new);
 void shutdown(void);
-
+int gettimeofday(void);
+int nanosleep(void);
+int clone(void);
+int wait4(void);
 // ulib.c
 int stat(const char*, struct stat*);
 char* strcpy(char*, const char*);
