@@ -48,3 +48,5 @@ entry("gettimeofday");
 entry("nanosleep");
 entry("clone");
 entry("wait4");
+entry("sched_yield");
+entry("getppid");

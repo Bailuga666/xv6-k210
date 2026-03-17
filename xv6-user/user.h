@@ -38,6 +38,8 @@ int gettimeofday(void);
 int nanosleep(void);
 int clone(void);
 int wait4(void);
+int sched_yield(void);
+int getppid(void);
 // ulib.c
 int stat(const char*, struct stat*);
 char* strcpy(char*, const char*);

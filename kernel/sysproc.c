@@ -289,3 +289,15 @@ sys_clone(void)
 {
   return clone();
 }
+
+uint64
+sys_sched_yield(void) {
+  yield();
+  return 0;
+}
+
+uint64
+sys_getppid(void)
+{
+  return myproc()->parent->pid;
+}

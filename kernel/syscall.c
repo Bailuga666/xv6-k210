@@ -126,7 +126,8 @@ extern uint64 sys_gettimeofday(void);
 extern uint64 sys_nanosleep(void);
 extern uint64 sys_clone(void);
 extern uint64 sys_wait4(void);
-
+extern uint64 sys_sched_yield(void);
+extern uint64 sys_getppid(void);
 static uint64 (*syscalls[])(void) = {
   [SYS_fork]        sys_fork,
   [SYS_exit]        sys_exit,
@@ -161,6 +162,8 @@ static uint64 (*syscalls[])(void) = {
   [SYS_nanosleep]   sys_nanosleep,
   [SYS_clone]       sys_clone,
   [SYS_wait4]       sys_wait4,
+  [SYS_sched_yield] sys_sched_yield,
+  [SYS_getppid]     sys_getppid,
 };
 
 static char *sysnames[] = {
@@ -197,6 +200,8 @@ static char *sysnames[] = {
   [SYS_nanosleep]    "nanosleep",
   [SYS_clone]        "clone",
   [SYS_wait4]        "wait4",
+  [SYS_sched_yield]  "sched_yield",
+  [SYS_getppid]      "getppid",
 };
 
 void
