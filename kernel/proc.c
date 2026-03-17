@@ -480,62 +480,61 @@ wait(int wpid, uint64 addr)
   struct proc *np;
   int havekids, havetarget, pid;
   struct proc *p = myproc();
-
+  // 现在检查进程的指针，有没有子进程，是否找到目标，子进程id，自己指针
   if(wpid == 0 || wpid < -1)
     return -1;
 
-  // hold p->lock for the whole time to avoid lost
-  // wakeups from a child's exit().
+  // 合法检查
   acquire(&p->lock);
-
+  // 取父进程的锁
   for(;;){
-    // Scan through table looking for exited children.
+    
     havekids = 0;
     havetarget = 0;
     for(np = proc; np < &proc[NPROC]; np++){
-      // this code uses np->parent without holding np->lock.
-      // acquiring the lock first would cause a deadlock,
-      // since np might be an ancestor, and we already hold p->lock.
       if(np->parent == p){
         havekids = 1;
         if(wpid > 0 && np->pid != wpid){
           continue;
         }
-        // np->parent can't change between the check and the acquire()
-        // because only the parent changes it, and we're the parent.
+        // 如果指定而且没找到，就下一个
         acquire(&np->lock);
+        // 取锁
         havetarget = 1;
+        // 找到目标了
         if(np->state == ZOMBIE){
-          // Found one.
+          // 如果是僵尸进程
           pid = np->pid;
           int status = np->xstate << 8;
+          // 左移8位
           if(addr != 0 && copyout2(addr, (char *)&status, sizeof(status)) < 0) {
             release(&np->lock);
             release(&p->lock);
             return -1;
           }
+          // 复制检查
           freeproc(np);
           release(&np->lock);
           release(&p->lock);
+          // 释放进程，解锁
           return pid;
         }
         release(&np->lock);
       }
     }
 
-    // No point waiting if we don't have any children.
     if(!havekids || p->killed){
       release(&p->lock);
       return -1;
     }
-
+    // 没有子进程或者被杀了，错误
     if(wpid > 0 && !havetarget){
       release(&p->lock);
       return -1;
     }
-    
-    // Wait for a child to exit.
-    sleep(p, &p->lock);  //DOC: wait-sleep
+    // 指定了目标但没找到，错误
+    sleep(p, &p->lock);  
+    // 睡眠，等待子进程状态改变
   }
 }
 
@@ -544,11 +543,10 @@ wait4(int wpid, uint64 addr, int options)
 {
   if(options == 0)
     return wait(wpid, addr);
-
-  // Only support WNOHANG(1) for now.
+  // 如果没有特殊选项，就调用普通的wait
   if(options != 1)
     return -1;
-
+  // 目前只支持1
   struct proc *np;
   int havekids = 0;
   int havetarget = 0;
@@ -589,6 +587,7 @@ wait4(int wpid, uint64 addr, int options)
     return -1;
 
   return 0;
+  // 全与上文相同
 }
 
 // Per-CPU process scheduler.
@@ -870,51 +869,53 @@ clone(void)
   int i, pid;
   uint64 stack;
   struct proc *np;
+  // 指向子进程的指针
   struct proc *p = myproc();
-
+  // 指向自己的
   if(argaddr(1, &stack) < 0){
     return -1;
   }
-
-  // Allocate process.
+  // 栈地址参数
   if((np = allocproc()) == NULL){
     return -1;
   }
+  // 分配失败
 
-  // Copy user memory from parent to child.
   if(uvmcopy(p->pagetable, np->pagetable, np->kpagetable, p->sz) < 0){
     freeproc(np);
     release(&np->lock);
     return -1;
   }
+  // 复制父进程的用户态内存
   np->sz = p->sz;
-
+  // 同步大小
   np->parent = p;
+  // 设置子进程父进程
 
-  // copy tracing mask from parent.
   np->tmask = p->tmask;
-
-  // copy saved user registers.
+  // 设置掩码
   *(np->trapframe) = *(p->trapframe);
+  // 复制陷阱帧
 
-  // Cause clone to return 0 in the child.
   np->trapframe->a0 = 0;
+  // 子进程返回值是0
   if(stack != 0){
     np->trapframe->sp = stack;
   }
-
-  // increment reference counts on open file descriptors.
+  // 如果指定了栈地址，则设置子进程的栈指针为该地址
   for(i = 0; i < NOFILE; i++)
-    if(p->ofile[i])
+    if(p->ofile[i]){
       np->ofile[i] = filedup(p->ofile[i]);
+      // 复制父进程的文件描述符
+    }
   np->cwd = edup(p->cwd);
-
+  // 复制父进程的当前工作目录
   safestrcpy(np->name, p->name, sizeof(p->name));
-
-  pid = np->pid;
-
+  // 复制父进程的名字
   np->state = RUNNABLE;
-
+  // 设置子进程状态为可运行
+  pid = np->pid;
+  // 保存子进程pid
   release(&np->lock);
 
   return pid;
