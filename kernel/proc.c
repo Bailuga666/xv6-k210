@@ -546,7 +546,7 @@ wait4(int wpid, uint64 addr, int options)
   // 如果没有特殊选项，就调用普通的wait
   if(options != 1)
     return -1;
-  // 目前只支持1
+  // 目前只支持WNOHANG，但是实际上测试样例也没用
   struct proc *np;
   int havekids = 0;
   int havetarget = 0;
