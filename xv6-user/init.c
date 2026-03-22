@@ -10,11 +10,11 @@
 char* argv[] = { 0 };
 char* tests[] = {
   // part 1
-  // "getcwd",
-  // "write",
-  // "getpid",
-  // "times",
-  // "uname",
+  "getcwd",
+  "write",
+  "getpid",
+  "times",
+  "uname",
   // part 3
   "wait",
   "waitpid",

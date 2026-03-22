@@ -218,7 +218,7 @@ uint64 sys_gettimeofday(void) {
 
   ts.tv_sec = htick / CLOCK_FREQ;
    // 换算成秒
-  ts.tv_usec = (htick % CLOCK_FREQ) / CLOCK_FREQ * 1000000 ; 
+  ts.tv_usec = (htick % CLOCK_FREQ) * 1000000 / CLOCK_FREQ;
   // 换算成微秒
 
   if (safe_copy(0, (char *)&ts, sizeof(ts)) < 0) {

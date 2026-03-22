@@ -89,33 +89,48 @@ main:
 	.section	.rodata.str1.8
 	.align	3
 .LC4:
-	.string	"wait"
+	.string	"getcwd"
 	.align	3
 .LC5:
-	.string	"waitpid"
+	.string	"write"
 	.align	3
 .LC6:
-	.string	"clone"
+	.string	"getpid"
 	.align	3
 .LC7:
-	.string	"fork"
+	.string	"times"
 	.align	3
 .LC8:
-	.string	"execve"
+	.string	"uname"
 	.align	3
 .LC9:
-	.string	"getppid"
+	.string	"wait"
 	.align	3
 .LC10:
-	.string	"exit"
+	.string	"waitpid"
 	.align	3
 .LC11:
-	.string	"yield"
+	.string	"clone"
 	.align	3
 .LC12:
-	.string	"gettimeofday"
+	.string	"fork"
 	.align	3
 .LC13:
+	.string	"execve"
+	.align	3
+.LC14:
+	.string	"getppid"
+	.align	3
+.LC15:
+	.string	"exit"
+	.align	3
+.LC16:
+	.string	"yield"
+	.align	3
+.LC17:
+	.string	"gettimeofday"
+	.align	3
+.LC18:
 	.string	"sleep"
 	.globl	argv
 	.data
@@ -124,7 +139,7 @@ main:
 	.type	counts, @object
 	.size	counts, 4
 counts:
-	.word	10
+	.word	15
 	.bss
 	.align	3
 	.set	.LANCHOR0,. + 0
@@ -136,7 +151,7 @@ argv:
 	.align	3
 	.set	.LANCHOR1,. + 0
 	.type	tests, @object
-	.size	tests, 80
+	.size	tests, 120
 tests:
 	.dword	.LC4
 	.dword	.LC5
@@ -148,5 +163,10 @@ tests:
 	.dword	.LC11
 	.dword	.LC12
 	.dword	.LC13
+	.dword	.LC14
+	.dword	.LC15
+	.dword	.LC16
+	.dword	.LC17
+	.dword	.LC18
 	.ident	"GCC: (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0"
 	.section	.note.GNU-stack,"",@progbits
