@@ -587,7 +587,7 @@ wait4(int wpid, uint64 addr, int options)
     return -1;
 
   return 0;
-  // 全与上文相同
+  // 全与上文相同，只是最后不睡眠了
 }
 
 // Per-CPU process scheduler.
