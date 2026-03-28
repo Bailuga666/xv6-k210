@@ -164,7 +164,10 @@ found:
   memset(&p->context, 0, sizeof(p->context));
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
-
+  // 初始化所有虚拟内存区域为无效
+  for(int i=0;i<NVMA;i++){
+    p->vmas[i].valid = 0;
+  }
   return p;
 }
 
@@ -373,6 +376,14 @@ fork(void)
 
   safestrcpy(np->name, p->name, sizeof(p->name));
 
+  for(int i=0;i<NVMA;i++){
+    if(p->vmas[i].valid){
+      np->vmas[i] = p->vmas[i];
+      if(np->vmas[i].vm_file){
+        filedup(np->vmas[i].vm_file);
+      }
+    }
+  }
   pid = np->pid;
 
   np->state = RUNNABLE;
@@ -430,7 +441,7 @@ exit(int status)
 
   eput(p->cwd);
   p->cwd = 0;
-
+  vma_free(p);
   // we might re-parent a child to init. we can't be precise about
   // waking up init, since we can't acquire its lock once we've
   // acquired any other proc lock. so wake up init whether that's
@@ -911,6 +922,15 @@ clone(void)
   np->cwd = edup(p->cwd);
   // 复制父进程的当前工作目录
   safestrcpy(np->name, p->name, sizeof(p->name));
+  // 复制虚拟内存区域表
+  for(int i=0;i<NVMA;i++){
+    if(p->vmas[i].valid){
+      np->vmas[i] = p->vmas[i];
+      if(np->vmas[i].vm_file){
+        filedup(np->vmas[i].vm_file);
+      }
+    }
+  }
   // 复制父进程的名字
   np->state = RUNNABLE;
   // 设置子进程状态为可运行

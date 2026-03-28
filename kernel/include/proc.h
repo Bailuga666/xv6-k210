@@ -8,7 +8,7 @@
 #include "file.h"
 #include "fat32.h"
 #include "trap.h"
-
+#include "vm.h"
 // Saved registers for kernel context switches.
 struct context {
   uint64 ra;
@@ -64,6 +64,7 @@ struct proc {
   struct dirent *cwd;          // Current directory
   char name[16];               // Process name (debugging)
   int tmask;                    // trace mask
+  struct vma vmas[NVMA];        // 进程的虚拟内存区域表
 };
 
 void            reg_info(void);

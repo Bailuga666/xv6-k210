@@ -301,3 +301,136 @@ sys_getppid(void)
 {
   return myproc()->parent->pid;
 }
+
+uint64 sys_brk(void) {
+  uint64 addr, new_addr;
+  int delta;
+
+  if (argaddr(0, &new_addr) < 0) {
+    return -1;
+  }
+  // 先记录当前的地址
+  addr = myproc()->sz;
+  // 如果参数是0，就直接返回当前地址
+  if (new_addr == 0) {
+    return addr;
+  }
+  // 计算增量
+  delta = new_addr - addr;
+  // 增长或者减少增量大小的堆
+  if (growproc(delta) < 0) {
+    return -1;
+  }
+  return 0;
+}
+uint64 sys_mmap(void) {
+  uint64 req_addr, len;
+  int prot, flags, fd, offset;
+  struct proc* p = myproc();
+  struct file* file = NULL;
+  // 读取参数
+  if (argaddr(0, &req_addr) < 0 ||
+      argaddr(1, &len) < 0 ||
+      argint(2, &prot) < 0 ||
+      argint(3, &flags) < 0 ||
+      argint(4, &fd) < 0 ||
+      argint(5, &offset) < 0) {
+    return -1;
+  }
+  // 检查参数长度，不允许指定地址
+  if (len == 0 || (offset % PGSIZE) != 0) {
+    return -1;
+  }
+  if (req_addr != 0 || (flags & MAP_FIXED)) {
+    return -1;
+  }
+  // 上取整
+  len = PGROUNDUP(len);
+  // 如果不是匿名映射
+  if (!(flags & MAP_ANONYMOUS)) {
+    // 文件描述符必须合法，且必须可读
+    if (fd < 0 || fd >= NOFILE) {
+      return -1;
+    }
+    file = p->ofile[fd];
+    if (file == NULL) {
+      return -1;
+    }
+  }
+  // 寻找一个空闲的 VMA 插槽
+  struct vma* slot = NULL;
+  for (int i = 0; i < NVMA; i++) {
+    if (p->vmas[i].valid == 0) {
+      slot = &p->vmas[i];
+      break;
+    }
+  }
+  // 如果找不到
+  if (slot == NULL) {
+    return -1;
+  }
+  // 寻找一个合适的地址
+  uint64 base = mmap_find_addr(p, len);
+  if (base == 0) {
+    return -1;
+  }
+  // 设置信息
+  slot->start = base;
+  slot->end = base + len;
+  slot->prot = prot;
+  slot->flags = flags;
+  slot->offset = offset;
+  slot->vm_file = file ? filedup(file) : NULL;
+  slot->valid = 1;
+
+  return base;
+}
+
+
+uint64 sys_munmap(void) {
+  uint64 addr;
+  int len;
+  struct proc* p = myproc();
+
+  // 读取参数
+  if (argaddr(0, &addr) < 0 || argint(1, &len) < 0) {
+    return -1;
+  }
+  // 地址必须页对齐，长度上取整
+  if (addr % PGSIZE != 0) {
+    return -1;
+  }
+  len = PGROUNDUP(len);
+  if (len == 0) {
+    return 0;
+  }
+
+  // 查找匹配的 VMA
+  struct vma* hit = NULL;
+  for (int i = 0; i < NVMA; i++) {
+    struct vma* v = &p->vmas[i];
+    if (v->valid && v->start == addr && (v->end - v->start) == len) {
+      hit = v;
+      break;
+    }
+  }
+  if (hit == NULL) {
+    return -1;
+  }
+
+  // 写回
+  vma_writeback(p, hit);
+
+  // 清理映射
+  vmunmap(p->pagetable, addr, len / PGSIZE, !(hit->flags & MAP_SHARED));
+
+  // 释放文件引用
+  if (hit->vm_file) {
+    fileclose(hit->vm_file);
+    hit->vm_file = NULL;
+  }
+
+  // 清空 VMA
+  hit->valid = 0;
+  return 0;
+}

@@ -16,7 +16,8 @@
 #define SYS_sbrk        12
 #define SYS_sleep       13
 #define SYS_uptime      14
-#define SYS_open        56
+#define SYS_open        55
+#define SYS_openat      56  
 #define SYS_write       64
 #define SYS_remove     117
 #define SYS_trace       18
@@ -37,4 +38,7 @@
 #define SYS_wait4      260
 #define SYS_sched_yield     124
 #define SYS_getppid      173
+#define SYS_brk 214
+#define SYS_mmap 222
+#define SYS_munmap 215
 #endif

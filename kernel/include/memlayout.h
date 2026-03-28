@@ -125,5 +125,5 @@
 #define TRAPFRAME               (TRAMPOLINE - PGSIZE)
 
 #define MAXUVA                  RUSTSBI_BASE
-
+#define MMAPBASE                0x60000000L
 #endif

@@ -128,6 +128,10 @@ extern uint64 sys_clone(void);
 extern uint64 sys_wait4(void);
 extern uint64 sys_sched_yield(void);
 extern uint64 sys_getppid(void);
+extern uint64 sys_openat(void);
+extern uint64 sys_brk(void);
+extern uint64 sys_mmap(void);
+extern uint64 sys_munmap(void);
 static uint64 (*syscalls[])(void) = {
   [SYS_fork]        sys_fork,
   [SYS_exit]        sys_exit,
@@ -164,6 +168,10 @@ static uint64 (*syscalls[])(void) = {
   [SYS_wait4]       sys_wait4,
   [SYS_sched_yield] sys_sched_yield,
   [SYS_getppid]     sys_getppid,
+  [SYS_openat]      sys_openat,
+  [SYS_brk]         sys_brk,
+  [SYS_mmap]        sys_mmap,
+  [SYS_munmap]      sys_munmap,
 };
 
 static char *sysnames[] = {
@@ -202,6 +210,10 @@ static char *sysnames[] = {
   [SYS_wait4]        "wait4",
   [SYS_sched_yield]  "sched_yield",
   [SYS_getppid]      "getppid",
+  [SYS_openat]       "openat",
+  [SYS_brk]          "brk",
+  [SYS_mmap]         "mmap",
+  [SYS_munmap]       "munmap",
 };
 
 void

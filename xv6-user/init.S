@@ -132,6 +132,21 @@ main:
 	.align	3
 .LC18:
 	.string	"sleep"
+	.align	3
+.LC19:
+	.string	"open"
+	.align	3
+.LC20:
+	.string	"openat"
+	.align	3
+.LC21:
+	.string	"brk"
+	.align	3
+.LC22:
+	.string	"mmap"
+	.align	3
+.LC23:
+	.string	"munmap"
 	.globl	argv
 	.data
 	.align	2
@@ -139,7 +154,7 @@ main:
 	.type	counts, @object
 	.size	counts, 4
 counts:
-	.word	15
+	.word	20
 	.bss
 	.align	3
 	.set	.LANCHOR0,. + 0
@@ -151,7 +166,7 @@ argv:
 	.align	3
 	.set	.LANCHOR1,. + 0
 	.type	tests, @object
-	.size	tests, 120
+	.size	tests, 160
 tests:
 	.dword	.LC4
 	.dword	.LC5
@@ -168,5 +183,10 @@ tests:
 	.dword	.LC16
 	.dword	.LC17
 	.dword	.LC18
+	.dword	.LC19
+	.dword	.LC20
+	.dword	.LC21
+	.dword	.LC22
+	.dword	.LC23
 	.ident	"GCC: (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0"
 	.section	.note.GNU-stack,"",@progbits

@@ -232,9 +232,9 @@ vmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
 
   for(a = va; a < va + npages*PGSIZE; a += PGSIZE){
     if((pte = walk(pagetable, a, 0)) == 0)
-      panic("vmunmap: walk");
+      continue;
     if((*pte & PTE_V) == 0)
-      panic("vmunmap: not mapped");
+      continue;
     if(PTE_FLAGS(*pte) == PTE_V)
       panic("vmunmap: not a leaf");
     if(do_free){
@@ -445,12 +445,15 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 int
 copyout2(uint64 dstva, char *src, uint64 len)
 {
-  uint64 sz = myproc()->sz;
-  if (dstva + len > sz || dstva >= sz) {
-    return -1;
-  }
-  memmove((void *)dstva, src, len);
-  return 0;
+  // uint64 sz = myproc()->sz;
+  // if (dstva + len > sz || dstva >= sz) {
+  //   return -1;
+  // }
+  // memmove((void *)dstva, src, len);
+  // return 0;
+
+  pagetable_t pagetable = myproc()->pagetable;
+  return copyout(pagetable, dstva, src, len);
 }
 
 // Copy from user to kernel.
@@ -481,12 +484,14 @@ copyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len)
 int
 copyin2(char *dst, uint64 srcva, uint64 len)
 {
-  uint64 sz = myproc()->sz;
-  if (srcva + len > sz || srcva >= sz) {
-    return -1;
-  }
-  memmove(dst, (void *)srcva, len);
-  return 0;
+  // uint64 sz = myproc()->sz;
+  // if (srcva + len > sz || srcva >= sz) {
+  //   return -1;
+  // }
+  // memmove(dst, (void *)srcva, len);
+  // return 0;
+  pagetable_t pagetable = myproc()->pagetable;
+  return copyin(pagetable, dst, srcva, len);
 }
 
 // Copy a null-terminated string from user to kernel.
@@ -647,4 +652,81 @@ void vmprint(pagetable_t pagetable)
     }
   }
   return;
+}
+
+void vma_writeback(struct proc* p,struct vma* vma){
+  // vma有效，共享+可写，必须关联文件，文件可写
+  if(vma->valid==0){
+    return;
+  }
+  if(!(vma->flags&MAP_SHARED)||!(vma->prot&PROT_WRITE)){
+    return;
+  }
+  if(vma->vm_file==NULL){
+    return;
+  }
+  if(vma->vm_file->writable==0){
+    return;
+  }
+  // 找到那个物理内存地址，写回文件
+  for(uint64 vaddr=vma->start;vaddr<vma->end;vaddr+=PGSIZE){
+    uint64 paddr = walkaddr(p->pagetable, vaddr);
+    if(paddr == 0){
+      continue;
+    }
+    uint64 offset = vma->offset + (vaddr - vma->start);
+    elock(vma->vm_file->ep);
+    ewrite(vma->vm_file->ep, 0, paddr, offset, PGSIZE);
+    eunlock(vma->vm_file->ep);
+  }
+}
+
+void vma_free(struct proc* p){
+  for(int i=0;i<NVMA;i++){
+    struct vma* vma=&p->vmas[i];
+    if(vma->valid){
+      // 解除映射
+      vmunmap(p->pagetable, vma->start, (vma->end - vma->start) / PGSIZE, !(vma->flags & MAP_SHARED));
+      if (vma->vm_file) {
+        fileclose(vma->vm_file);
+        vma->vm_file = NULL;
+      }
+      vma->valid = 0;
+    }
+  }
+}
+uint64 mmap_find_addr(struct proc* p, uint64 len)
+{
+    // 从 MMAP 固定基地址开始向下分配
+    uint64 addr = MMAPBASE;
+    // 无限循环寻找空闲区域
+    while (1) {
+        // 每次向下移动一段长度（从高地址往低地址找）
+        addr -= len;
+        // 碰到堆顶，地址空间不足，返回失败
+        if (addr < p->sz) {
+            return 0;
+        }
+        // 标记：当前区域是否与已有 VMA 冲突
+        int conflict = 0;
+        // 遍历所有 VMA，检查是否重叠
+        for (int i = 0; i < NVMA; i++) {
+            struct vma* v = &p->vmas[i];
+            // 只检查有效的 VMA
+            if (!v->valid)
+                continue;
+            // 判断两个区间【是否重叠】（核心判断）
+            // 有重叠
+            if (v->end >= addr && v->start <= addr + len) {
+                conflict = 1;
+                // 跳到这个 VMA 开头，下一轮直接跳过整块占用区
+                addr = v->start;
+                break;
+            }
+        }
+        // 没有冲突 → 找到可用地址
+        if (!conflict) {
+            return addr;
+        }
+    }
 }

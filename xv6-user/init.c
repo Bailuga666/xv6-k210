@@ -15,7 +15,7 @@ char* tests[] = {
   "getpid",
   "times",
   "uname",
-  // part 3
+  // part 2
   "wait",
   "waitpid",
   "clone",
@@ -26,6 +26,12 @@ char* tests[] = {
   "yield",
   "gettimeofday",
   "sleep",
+  // part 3
+  "open",
+  "openat",
+  "brk",
+  "mmap",
+  "munmap",
 };
 int counts = sizeof(tests) / sizeof((tests)[0]);
 

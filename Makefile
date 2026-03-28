@@ -230,9 +230,15 @@ fs: $(UPROGS) $(TESTCASES)
 		  cp $$file $(dst)/$${file#$U/_};\
 		  cp $$file $(dst)/bin/$${file#$U/_}; done
 	@for file in $${TEST:-riscv64}/*; do \
+		  name=$${file#$${TEST:-riscv64}/}; \
+		  if [ -d $$file ]; then \
+			mkdir -p $(dst)/$$name; \
+			cp -r $$file/. $(dst)/$$name/; \
+			continue; \
+		  fi; \
 		  [ -f $$file ] || continue; \
-		  cp $$file $(dst)/$${file#$${TEST:-riscv64}/}; \
-		  cp $$file $(dst)/bin/$${file#$${TEST:-riscv64}/}; done
+		  cp $$file $(dst)/$$name; \
+		  cp $$file $(dst)/bin/$$name; done
 	@  umount $(dst)
 
 # Write mounted sdcard
