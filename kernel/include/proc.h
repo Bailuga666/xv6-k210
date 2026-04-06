@@ -66,7 +66,7 @@ struct proc {
   int tmask;                    // trace mask
   struct vma vmas[NVMA];        // 进程的虚拟内存区域表
 };
-
+// dadawd
 void            reg_info(void);
 int             cpuid(void);
 void            exit(int);
