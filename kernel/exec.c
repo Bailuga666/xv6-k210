@@ -157,17 +157,6 @@ int exec(char *path, char **argv)
   p->sz = sz;
   p->trapframe->epc = elf.entry;  // initial program counter = main
   p->trapframe->sp = sp; // initial stack pointer
-  // 清理旧的vma
-  for(int i=0;i<NVMA;i++){
-    struct vma* vma = &p->vmas[i];
-    if(vma->valid){
-      if(vma->vm_file){
-        fileclose(vma->vm_file);
-        vma->vm_file = NULL;
-      }
-      vma->valid = 0;
-    }
-  }
 
   proc_freepagetable(oldpagetable, oldsz);
   w_satp(MAKE_SATP(p->kpagetable));

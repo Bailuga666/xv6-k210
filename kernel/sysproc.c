@@ -344,6 +344,9 @@ uint64 sys_mmap(void) {
   if (req_addr != 0 || (flags & MAP_FIXED)) {
     return -1;
   }
+  if ((prot & (PROT_READ | PROT_WRITE | PROT_EXEC)) == 0) {
+    return -1;
+  }
   // 上取整
   len = PGROUNDUP(len);
   // 如果不是匿名映射
@@ -374,6 +377,67 @@ uint64 sys_mmap(void) {
   if (base == 0) {
     return -1;
   }
+
+  // 计算页表权限：
+  int pte_flags = PTE_U;
+  if (prot & PROT_READ) {
+    pte_flags |= PTE_R;
+  }
+  if (prot & PROT_WRITE) {
+    pte_flags |= PTE_W;
+  }
+  if (prot & PROT_EXEC) {
+    pte_flags |= PTE_X;
+  }
+
+  // mapped_len 记录“已经成功映射”的总字节数
+  uint64 mapped_len = 0;
+  // 按页立即分配物理内存并建立映射
+  for (uint64 off = 0; off < len; off += PGSIZE) {
+    // 先分配一页物理内存，供当前虚拟页使用。
+    char* mem = kalloc();
+    if (mem == NULL) {
+      // 内存分配失败
+      if (mapped_len > 0) {
+        vmunmap(p->kpagetable, base, mapped_len / PGSIZE, 0);
+        vmunmap(p->pagetable, base, mapped_len / PGSIZE, 1);
+      }
+      return -1;
+    }
+    // 先清零，匿名映射
+    memset(mem, 0, PGSIZE);
+
+    if (file) {
+      // 文件映射：从文件 offset+off 位置读取一页到新分配的物理页。
+      uint64 file_off = (uint64)offset + off;
+      elock(file->ep);
+      eread(file->ep, 0, (uint64)mem, file_off, PGSIZE);
+      eunlock(file->ep);
+    }
+
+    // 建立用户页表映射
+    if (mappages(p->pagetable, base + off, PGSIZE, (uint64)mem, pte_flags) != 0) {
+      // 映射失败
+      kfree(mem);
+      if (mapped_len > 0) {
+        vmunmap(p->kpagetable, base, mapped_len / PGSIZE, 0);
+        vmunmap(p->pagetable, base, mapped_len / PGSIZE, 1);
+      }
+      return -1;
+    }
+    // 同步建立内核页表映射
+    if (mappages(p->kpagetable, base + off, PGSIZE, (uint64)mem, pte_flags & ~PTE_U) != 0) {
+      // 映射失败
+      vmunmap(p->pagetable, base + off, 1, 1);
+      if (mapped_len > 0) {
+        vmunmap(p->kpagetable, base, mapped_len / PGSIZE, 0);
+        vmunmap(p->pagetable, base, mapped_len / PGSIZE, 1);
+      }
+      return -1;
+    }
+    mapped_len += PGSIZE;
+  }
+
   // 设置信息
   slot->start = base;
   slot->end = base + len;

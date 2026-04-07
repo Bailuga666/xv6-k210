@@ -376,14 +376,6 @@ fork(void)
 
   safestrcpy(np->name, p->name, sizeof(p->name));
 
-  for(int i=0;i<NVMA;i++){
-    if(p->vmas[i].valid){
-      np->vmas[i] = p->vmas[i];
-      if(np->vmas[i].vm_file){
-        filedup(np->vmas[i].vm_file);
-      }
-    }
-  }
   pid = np->pid;
 
   np->state = RUNNABLE;
@@ -922,15 +914,6 @@ clone(void)
   np->cwd = edup(p->cwd);
   // 复制父进程的当前工作目录
   safestrcpy(np->name, p->name, sizeof(p->name));
-  // 复制虚拟内存区域表
-  for(int i=0;i<NVMA;i++){
-    if(p->vmas[i].valid){
-      np->vmas[i] = p->vmas[i];
-      if(np->vmas[i].vm_file){
-        filedup(np->vmas[i].vm_file);
-      }
-    }
-  }
   // 复制父进程的名字
   np->state = RUNNABLE;
   // 设置子进程状态为可运行

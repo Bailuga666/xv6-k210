@@ -12,8 +12,6 @@
 #include "include/console.h"
 #include "include/timer.h"
 #include "include/disk.h"
-#include "include/kalloc.h"
-#include "include/string.h"
 
 extern char trampoline[], uservec[], userret[];
 
@@ -83,59 +81,9 @@ usertrap(void)
     // ok
   } 
   else {
-    // 先记录原因与地址
-    uint64 scause = r_scause();
-    uint64 stval = r_stval();
-    // 如果是页错误，尝试处理
-    if (scause == 12 || scause == 13 || scause == 15) {
-      struct vma* hit = NULL;
-      for (int i = 0; i < NVMA; i++) {
-        struct vma* v = &p->vmas[i];
-        if (v->valid && stval >= v->start && stval < v->end) {
-          hit = v;
-          break;
-        }
-      }
-      // 没找到就杀掉进程
-      if (hit == NULL) {
-        p->killed = 1;
-      } else {
-        // 找到页边界
-        uint64 va_start = PGROUNDDOWN(stval);
-        char* mem = kalloc();
-        if (mem == 0) {
-          p->killed = 1;
-        } else {
-          // 如果是匿名映射，直接清零
-          memset(mem, 0, PGSIZE);
-          // 如果是文件映射，从文件读取内容
-          if (hit->vm_file) {
-            uint64 file_offset = hit->offset + (va_start - hit->start);
-            elock(hit->vm_file->ep);
-            eread(hit->vm_file->ep, 0, (uint64)mem, file_offset, PGSIZE);
-            eunlock(hit->vm_file->ep);
-          }
-          // 构造页表权限
-          int pte_flags = PTE_U;
-          if (hit->prot & PROT_READ)  pte_flags |= PTE_R;
-          if (hit->prot & PROT_WRITE) pte_flags |= PTE_W;
-          if (hit->prot & PROT_EXEC)  pte_flags |= PTE_X;
-          // 映射到用户空间和内核空间
-          if (mappages(p->pagetable, va_start, PGSIZE, (uint64)mem, pte_flags) != 0 ||
-              mappages(p->kpagetable, va_start, PGSIZE, (uint64)mem, pte_flags & ~PTE_U) != 0) {
-                // 如果映射失败就释放内存并杀掉进程
-            kfree(mem);
-            vmunmap(p->pagetable, va_start, 1, 1);
-            p->killed = 1;
-          }
-        }
-      }
-    }
-    else {
-      printf("\nusertrap(): unexpected scause %p pid=%d %s\n", r_scause(), p->pid, p->name);
-      printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
-      p->killed = 1;
-    }
+    printf("\nusertrap(): unexpected scause %p pid=%d %s\n", r_scause(), p->pid, p->name);
+    printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+    p->killed = 1;
   }
   if(p->killed)
     exit(-1);
