@@ -27,11 +27,24 @@ char* tests[] = {
   "gettimeofday",
   "sleep",
   // part 3
-  "open",
-  "openat",
   "brk",
   "mmap",
   "munmap",
+  // part 7
+  "dup",
+  "dup2",
+  "pipe",
+  "open",
+  "openat",
+  "close",
+  "getdents",
+  "read",
+  "mkdir_",
+  "chdir",
+  "unlink",
+  "mount",
+  "umount",
+  "fstat",
 };
 int counts = sizeof(tests) / sizeof((tests)[0]);
 

@@ -132,6 +132,13 @@ extern uint64 sys_openat(void);
 extern uint64 sys_brk(void);
 extern uint64 sys_mmap(void);
 extern uint64 sys_munmap(void);
+extern uint64 sys_dup3(void);
+extern uint64 sys_pipe2(void);
+extern uint64 sys_getdents64(void);
+extern uint64 sys_mkdirat(void);
+extern uint64 sys_unlinkat(void);
+extern uint64 sys_mount(void);
+extern uint64 sys_umount2(void);
 static uint64 (*syscalls[])(void) = {
   [SYS_fork]        sys_fork,
   [SYS_exit]        sys_exit,
@@ -172,6 +179,13 @@ static uint64 (*syscalls[])(void) = {
   [SYS_brk]         sys_brk,
   [SYS_mmap]        sys_mmap,
   [SYS_munmap]      sys_munmap,
+  [SYS_dup3]       sys_dup3,
+  [SYS_pipe2]      sys_pipe2,
+  [SYS_getdents64] sys_getdents64,
+  [SYS_mkdirat]    sys_mkdirat,
+  [SYS_unlinkat]   sys_unlinkat,
+  [SYS_mount]      sys_mount,
+  [SYS_umount2]    sys_umount2,
 };
 
 static char *sysnames[] = {
@@ -214,6 +228,13 @@ static char *sysnames[] = {
   [SYS_brk]          "brk",
   [SYS_mmap]         "mmap",
   [SYS_munmap]       "munmap",
+  [SYS_dup3]       "dup3",
+  [SYS_pipe2]      "pipe2",
+  [SYS_getdents64] "getdents64",
+  [SYS_mkdirat]    "mkdirat",
+  [SYS_unlinkat]   "unlinkat",
+  [SYS_mount]      "mount",
+  [SYS_umount2]    "umount2",
 };
 
 void

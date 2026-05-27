@@ -20,7 +20,8 @@
 #include "include/string.h"
 #include "include/printf.h"
 #include "include/vm.h"
-
+#define DT_DIR  4   // 目录
+#define DT_REG  8   // 普通文件
 
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
@@ -114,11 +115,34 @@ uint64
 sys_fstat(void)
 {
   struct file *f;
-  uint64 st; // user pointer to struct stat
+  uint64 addr;
 
-  if(argfd(0, 0, &f) < 0 || argaddr(1, &st) < 0)
+  if(argfd(0, 0, &f) < 0 || argaddr(1, &addr) < 0)
     return -1;
-  return filestat(f, st);
+
+  if(f->type != FD_ENTRY)
+    return -1;
+
+  elock(f->ep);
+
+  struct kstat kst;
+  memset(&kst, 0, sizeof(kst));
+  // 文件设备号，inode号，因为fat32没有真正的inode，所以用首簇号代替
+  // 权限和类型，链接数不支持设置1，文件大小，块大小，块数
+
+  kst.st_dev = f->ep->dev;
+  kst.st_ino = f->ep->first_clus;
+  kst.st_mode = (f->ep->attribute & ATTR_DIRECTORY) ? 0040755 : 0100755;
+  kst.st_nlink = 1;
+  kst.st_size = f->ep->file_size;
+  kst.st_blksize = 512;
+  kst.st_blocks = (f->ep->file_size + 511) / 512;
+
+  eunlock(f->ep);
+
+  if(copyout2(addr, (char*)&kst, sizeof(kst)) < 0)
+    return -1;
+  return 0;
 }
 
 static struct dirent*
@@ -734,3 +758,157 @@ fail:
     eput(src);
   return -1;
 }
+uint64
+sys_dup3(void)
+{
+  struct file *f;
+  int oldfd, newfd, flags;
+
+  if(argint(0, &oldfd) < 0 || argint(1, &newfd) < 0 || argint(2, &flags) < 0)
+    return -1;
+
+  if(oldfd < 0 || oldfd >= NOFILE || newfd < 0 || newfd >= NOFILE)
+    return -1;
+
+  struct proc *p = myproc();
+  f = p->ofile[oldfd];
+  if(f == NULL)
+    return -1;
+
+  // 如果 newfd 已经打开，先关闭
+  if(p->ofile[newfd] != NULL)
+    fileclose(p->ofile[newfd]);
+
+  p->ofile[newfd] = f;
+  filedup(f);  // 增加引用计数
+  return newfd;
+}
+
+uint64
+sys_pipe2(void)
+{
+  // flags 参数当前测试传入 0，直接复用 sys_pipe
+  return sys_pipe();
+}
+
+uint64
+sys_mkdirat(void)
+{
+  char path[FAT32_MAX_PATH];
+  int dirfd, mode;
+  struct dirent *ep;
+
+  if(argint(0, &dirfd) < 0 || argstr(1, path, FAT32_MAX_PATH) < 0 || argint(2, &mode) < 0)
+    return -1;
+
+  if(strlen(path) == 0)
+    return -1;
+
+  // 根据 dirfd 将相对路径转换为绝对路径
+  if(get_path(path, dirfd) < 0)
+    return -1;
+  ep = create(path, T_DIR, 0);
+  if(ep == NULL){
+    return -1;
+  }
+    
+  eunlock(ep);
+  eput(ep);
+  return 0;
+}
+uint64
+sys_unlinkat(void)
+{
+  char path[FAT32_MAX_PATH];
+  int dirfd, flags;
+  struct dirent *ep;
+  int len;
+
+  if(argint(0, &dirfd) < 0 || argstr(1, path, FAT32_MAX_PATH) < 0 || argint(2, &flags) < 0)
+    return -1;
+
+  len = strlen(path);
+
+  // 不允许删除 "." 和以 "/" 结尾的路径
+  char *s = path + len - 1;
+  while(s >= path && *s == '/') s--;
+  if(s >= path && *s == '.' && (s == path || *--s == '/'))
+    return -1;
+
+  if((ep = ename(path)) == NULL)
+    return -1;
+
+  elock(ep);
+  // 如果是目录，必须为空才能删除
+  if((ep->attribute & ATTR_DIRECTORY) && !isdirempty(ep)){
+    eunlock(ep);
+    eput(ep);
+    return -1;
+  }
+
+  elock(ep->parent);
+  eremove(ep);
+  eunlock(ep->parent);
+  eunlock(ep);
+  eput(ep);
+  return 0;
+}
+
+uint64
+sys_getdents64(void)
+{
+  struct file *f;
+  uint64 dirp_addr;
+  int count;
+  // 参数检查：文件描述符、用户缓冲区地址、缓冲区大小
+  if(argfd(0, 0, &f) < 0 || argaddr(1, &dirp_addr) < 0 || argint(2, &count) < 0)
+    return -1;
+
+  if(f->readable == 0 || !(f->ep->attribute & ATTR_DIRECTORY))
+    return -1;
+
+  int nread = 0;
+  // 每个目录项的记录长度：固定部分 18 字节 + 文件名最大长度 255 字节 = 273 字节，再加上对齐填充到 275 字节
+  int reclen = 8 + 8 + 2 + 1 + (FAT32_MAX_FILENAME + 1);  // 275
+  // 没满
+  while(nread + reclen <= count) {
+    struct dirent de;
+    int entry_count = 0;
+    int ret;
+
+    elock(f->ep);
+    // 内层循环：跳过空槽
+    while((ret = enext(f->ep, &de, f->off, &entry_count)) == 0) {
+      f->off += entry_count * 32;
+    }
+    eunlock(f->ep);
+
+    if(ret == -1)  // 目录结束
+      return nread;
+
+    char buf[275];
+    memset(buf, 0, sizeof(buf));
+    // d_ino: offset 0, 8 bytes
+    *(uint64*)(buf + 0) = 0;
+    // d_off: offset 8, 8 bytes
+    *(uint64*)(buf + 8) = f->off ;
+    // d_reclen: offset 16, 2 bytes
+    *(uint16*)(buf + 16) = reclen;
+    // d_type: offset 17, 1 byte
+    buf[17] = (de.attribute & ATTR_DIRECTORY) ? DT_DIR : DT_REG;
+    // d_name: offset 18, 变长字符串
+    safestrcpy(buf + 18, de.filename, FAT32_MAX_FILENAME + 1);
+
+    if(copyout2(dirp_addr + nread, buf, reclen) < 0)
+      return -1;
+
+    nread += reclen;
+    f->off += entry_count * 32;
+  }
+
+  return nread;
+}
+
+uint64 sys_umount2(void)   { return 0; }
+uint64 sys_mount(void)     { return 0; }
+

@@ -134,19 +134,55 @@ main:
 	.string	"sleep"
 	.align	3
 .LC19:
-	.string	"open"
-	.align	3
-.LC20:
-	.string	"openat"
-	.align	3
-.LC21:
 	.string	"brk"
 	.align	3
-.LC22:
+.LC20:
 	.string	"mmap"
 	.align	3
-.LC23:
+.LC21:
 	.string	"munmap"
+	.align	3
+.LC22:
+	.string	"dup"
+	.align	3
+.LC23:
+	.string	"dup2"
+	.align	3
+.LC24:
+	.string	"pipe"
+	.align	3
+.LC25:
+	.string	"open"
+	.align	3
+.LC26:
+	.string	"openat"
+	.align	3
+.LC27:
+	.string	"close"
+	.align	3
+.LC28:
+	.string	"getdents"
+	.align	3
+.LC29:
+	.string	"read"
+	.align	3
+.LC30:
+	.string	"mkdir_"
+	.align	3
+.LC31:
+	.string	"chdir"
+	.align	3
+.LC32:
+	.string	"unlink"
+	.align	3
+.LC33:
+	.string	"mount"
+	.align	3
+.LC34:
+	.string	"umount"
+	.align	3
+.LC35:
+	.string	"fstat"
 	.globl	argv
 	.data
 	.align	2
@@ -154,7 +190,7 @@ main:
 	.type	counts, @object
 	.size	counts, 4
 counts:
-	.word	20
+	.word	32
 	.bss
 	.align	3
 	.set	.LANCHOR0,. + 0
@@ -166,7 +202,7 @@ argv:
 	.align	3
 	.set	.LANCHOR1,. + 0
 	.type	tests, @object
-	.size	tests, 160
+	.size	tests, 256
 tests:
 	.dword	.LC4
 	.dword	.LC5
@@ -188,5 +224,17 @@ tests:
 	.dword	.LC21
 	.dword	.LC22
 	.dword	.LC23
+	.dword	.LC24
+	.dword	.LC25
+	.dword	.LC26
+	.dword	.LC27
+	.dword	.LC28
+	.dword	.LC29
+	.dword	.LC30
+	.dword	.LC31
+	.dword	.LC32
+	.dword	.LC33
+	.dword	.LC34
+	.dword	.LC35
 	.ident	"GCC: (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0"
 	.section	.note.GNU-stack,"",@progbits

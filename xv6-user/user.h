@@ -40,6 +40,14 @@ int clone(void);
 int wait4(void);
 int sched_yield(void);
 int getppid(void);
+int dup3(void);
+int pipe2(void);
+int openat(void);
+int getdents64(void);
+int mkdirat(void);
+int unlinkat(void);
+int mount(void);
+int umount2(void);
 // ulib.c
 int stat(const char*, struct stat*);
 char* strcpy(char*, const char*);
